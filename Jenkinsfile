@@ -1,4 +1,4 @@
-#Groovy
+Groovy
 pipeline {
     // Usamos un agente que tenga python3 y pip
     agent { docker { image 'python:3.9-slim' } } 
