@@ -1,32 +1,44 @@
-Groovy
 pipeline {
-    // Usamos un agente que tenga python3 y pip
-    agent { docker { image 'python:3.9-slim' } } 
+  agent any
+  options { timestamps(); ansiColor('xterm') }
 
-    stages {
-        stage('Build') {
-            steps {
-                echo 'Construyendo el proyecto...'
-            }
-        }
-        stage('Test') {
-            steps {
-                echo 'Ejecutando pruebas...'
-            }
-        }
-        stage('Security Scan') {
-            steps {
-                echo 'Instalando herramientas de seguridad...'
-                // Instala las dependencias y la herramienta bandit
-                sh 'pip install -r requirements.txt'
-
-                echo 'Ejecutando análisis estático con Bandit...'
-                // Ejecuta bandit. 
-                // '|| true' es para que el pipeline no falle si encuentra 
-                // vulnerabilidades, solo queremos el reporte por ahora.
-                sh 'bandit -r . || true' 
-            }
-        }
+  stages {
+    stage('Build') {
+      steps {
+        echo 'Construyendo el proyecto...'
+        sh 'docker --version'  // para verificar que Jenkins ve Docker
+      }
     }
+
+    stage('Test') {
+      steps {
+        echo 'Ejecutando pruebas (en contenedor Python)...'
+        sh '''
+          docker run --rm -v "$PWD":/ws -w /ws python:3.9-slim \
+            sh -c "python - <<'PY'
+from app import main
+assert main()== 'OK', 'La función main no devolvió OK'
+print('Tests OK')
+PY"
+        '''
+      }
+    }
+
+    stage('Security Scan') {
+      steps {
+        echo 'Ejecutando Bandit (en contenedor Python)...'
+        sh '''
+          docker run --rm -v "$PWD":/ws -w /ws python:3.9-slim \
+            sh -c "python -m pip install --upgrade pip && \
+                   pip install -r requirements.txt && \
+                   bandit -r . || true"
+        '''
+      }
+    }
+  }
+
+  post {
+    always { echo 'Pipeline finalizado.' }
+  }
 }
 
